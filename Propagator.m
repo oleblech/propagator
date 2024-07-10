@@ -2,17 +2,19 @@ classdef Propagator
     properties
         spacecraft % Spacecraft object
         centralBody % CentralBody object
+        startTime % Epoch when simulation starts
         timeStep % Time step for recording output
-        totalTime % Total simulation time
+        stopTime % Epoch when simulation ends
         altitudeLimit % below this altitude the propagation is aborted
     end
     
     methods
-        function obj = Propagator(spacecraft, centralBody, timeStep, totalTime, altitudeLimit)
+        function obj = Propagator(spacecraft, centralBody, startTime, timeStep, stopTime, altitudeLimit)
             obj.spacecraft = spacecraft;
             obj.centralBody = centralBody;
+            obj.startTime = startTime;
             obj.timeStep = timeStep;
-            obj.totalTime = totalTime;
+            obj.stopTime = stopTime;
             obj.altitudeLimit = altitudeLimit;
         end
         
@@ -21,7 +23,8 @@ classdef Propagator
             initialState = [obj.spacecraft.state.position; obj.spacecraft.state.velocity];
             
             % Time span for integration
-            tspan = [0 obj.totalTime];
+            duration = seconds(obj.stopTime - obj.startTime); % duration in seconds
+            tspan = [0 duration];
             
             % Set error tolerances and event function
             options = odeset('reltol', 1.e-10, ...
@@ -32,8 +35,8 @@ classdef Propagator
             [T, Y, TE, YE, IE] = ode45(@odefun, tspan, initialState, options);
             
             % Interpolate results at specified time steps for output
-            numSteps = floor(obj.totalTime / obj.timeStep) + 1;
-            tOutput = linspace(0, obj.totalTime, numSteps);
+            numSteps = floor(duration / obj.timeStep) + 1;
+            tOutput = linspace(0, duration, numSteps);
             Y_interp = interp1(T, Y, tOutput);
             
             % Store trajectory as [x, y, z, vx, vy, vz] for each time step
@@ -44,14 +47,26 @@ classdef Propagator
                 % Extract position and velocity
                 position = state(1:3);
                 velocity = state(4:6);
+
+                % Convert ECI position to LLA (latitude, longitude, altitude)
+                utcDateTime = obj.startTime + seconds(t);
+                utcDateTimeArray = [year(utcDateTime)...
+                                    month(utcDateTime)...
+                                    day(utcDateTime)...
+                                    hour(utcDateTime)...
+                                    minute(utcDateTime)...
+                                    second(utcDateTime)];
+                lla = eci2lla(position', utcDateTimeArray);
+                latitude = lla(1);
+                longitude = lla(2);
+                altitude = lla(3);
                 
                 % Compute gravitational acceleration
                 gravityAcc = obj.centralBody.getGravityAccel(position);
                 
                 % Compute atmospheric drag if atmosphere model is present
                 if ~isempty(obj.centralBody.atmosphereModel)
-                    altitude = norm(position) - obj.centralBody.radius;
-                    density = obj.centralBody.atmosphereModel.density(altitude);
+                    density = obj.centralBody.atmosphereModel.density(latitude, longitude, altitude, utcDateTime);
                     dragForce = obj.spacecraft.applyDrag(density, velocity);
                     dragAcc = dragForce / obj.spacecraft.mass;
                 else

@@ -7,7 +7,7 @@ earthMass = 5.974e24; % kg
 earthRadius = 6.378e6; % m
 J2 = 0;
 J2 = 1.08262668e-3;
-atmosphereModel = AtmosphereModel('USSA76');
+atmosphereModel = AtmosphereModel('nrlmsise00');
 earth = CentralBody(earthMass, earthRadius, J2, atmosphereModel);
 
 % Define spacecraft using classical orbital elements, r_peri & r_apo, h_e
@@ -38,10 +38,11 @@ initialCondition = [earth.radius + 250e3,...    % r_peri
 spacecraft = Spacecraft(spacecraftMass, dragArea, dragCoefficient, initialCondition, conditionType, earth);
 
 % Define propagator
+startTime = datetime(2000,1,1,12,0,0);
 timeStep = 10; % seconds
-totalTime = 3600*3; % seconds
+stopTime = startTime + hours(3);
 altitudeLimit = 200e3; % m
-propagator = Propagator(spacecraft, earth, timeStep, totalTime, altitudeLimit);
+propagator = Propagator(spacecraft, earth,startTime, timeStep, stopTime, altitudeLimit);
 
 % Run propagation
 trajectory = propagator.propagate();
@@ -68,38 +69,39 @@ view(azimuth, elevation);
 
 % Plot orbital elements over time
 f2 = figure;
+duration = seconds(stopTime - startTime); % in seconds
 subplot(3, 2, 1);
-plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 1));
+plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 1));
 xlabel('Time (s)');
 ylabel('Semi-major axis (m)');
 title('Semi-major axis');
 
 subplot(3, 2, 2);
-plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 2));
+plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 2));
 xlabel('Time (s)');
 ylabel('Eccentricity');
 title('Eccentricity');
 
 subplot(3, 2, 3);
-plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 3));
+plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 3));
 xlabel('Time (s)');
 ylabel('Inclination (rad)');
 title('Inclination');
 
 subplot(3, 2, 4);
-plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 4));
+plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 4));
 xlabel('Time (s)');
 ylabel('RAAN (rad)');
 title('RAAN');
 
 subplot(3, 2, 5);
-plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 5));
+plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 5));
 xlabel('Time (s)');
 ylabel('Argument of Periapsis (rad)');
 title('Argument of Periapsis');
 
 subplot(3, 2, 6);
-plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 6));
+plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 6));
 xlabel('Time (s)');
 ylabel('True Anomaly (rad)');
 title('True Anomaly');
