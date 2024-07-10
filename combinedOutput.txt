@@ -1,0 +1,533 @@
+
+
+% AtmosphereModel.mclassdef AtmosphereModel
+    properties
+        modelType
+    end
+    
+    methods
+        function obj = AtmosphereModel(modelType)
+            obj.modelType = modelType;
+        end
+        
+        function rho = density(obj, altitude)
+            % Return the atmospheric density at a given altitude
+            switch obj.modelType
+                case 'USSA76' % US Standard Atmosphere 1976
+                    % Geometric altitudes (m)
+                    h = ...
+                    [  0  25  30  40  50  60   70 ...
+                      80  90 100 110 120 130  140 ...
+                     150 180 200 250 300 350  400 ...
+                     450 500 600 700 800 900 1000]*1e3;
+                     
+                    % Corresponding densities (kg/m^3) from USSA76 
+                    r = ...
+                    [1.225     4.008e-2  1.841e-2  3.996e-3  1.027e-3  3.097e-4  8.283e-5 ...
+                     1.846e-5  3.416e-6  5.606e-7  9.708e-8  2.222e-8  8.152e-9  3.831e-9 ...
+                     2.076e-9  5.194e-10 2.541e-10 6.073e-11 1.916e-11 7.014e-12 2.803e-12 ...
+                     1.184e-12 5.215e-13 1.137e-13 3.070e-14 1.136e-14 5.759e-15 3.561e-15];     
+                      
+                    % Scale heights (m)
+                    H = ...
+                    [ 7.310  6.427  6.546   7.360   8.342   7.583   6.661 ...
+                      5.927  5.533  5.703   6.782   9.973  13.243  16.322 ...
+                     21.652 27.974 34.934  43.342  49.755  54.513  58.019 ...
+                     60.980 65.654 76.377 100.587 147.203 208.020]*1e3; 
+                     
+                    % Handle altitudes outside of the range
+                    if altitude > 1e6
+                        altitude = 1e6;
+                    elseif altitude < 0
+                        altitude = 0;
+                    end
+                     
+                    % Determine the interpolation interval
+                    for j = 1:27
+                        if altitude >= h(j) && altitude < h(j+1)
+                            i = j;
+                        end
+                    end
+                    if altitude == 1e6
+                        i = 27;
+                    end
+                     
+                    % Exponential interpolation:
+                    rho = r(i) * exp(-(altitude - h(i))/H(i));
+
+                case 'exponential'
+                    rho0 = 1.225; % kg/m^3 at sea level
+                    H = 8500; % Scale height in meters
+                    rho = rho0 * exp(-altitude / H);
+
+                case 'none'
+                    % No atmosphere
+                    rho = 0;
+
+                otherwise
+                    error('Unknown atmospheric model type');
+            end
+        end
+    end
+end
+
+% CentralBody.mclassdef CentralBody
+    properties
+        mass
+        radius
+        gravitationalParameter
+        J2
+        atmosphereModel
+    end
+    
+    methods
+        function obj = CentralBody(mass, radius, J2, atmosphereModel)
+            obj.mass = mass;
+            obj.radius = radius;
+            obj.gravitationalParameter = 6.674e-11 * mass; % G * mass
+            obj.J2 = J2;
+            obj.atmosphereModel = atmosphereModel;
+        end
+        
+        function gravityAcc = getGravityAccel(obj, position)
+            % Compute gravitational field at a given position
+            r = norm(position);
+            
+            % Standard gravitational acceleration
+            gravityAcc = -obj.gravitationalParameter / r^2 * (position / r);
+            
+            if ~isempty(obj.J2) && obj.J2 ~= 0
+                % Add J2 perturbation effects
+                gravityAcc = gravityAcc + computeJ2Perturbation(position);
+            end
+            
+            function J2Acc = computeJ2Perturbation(position)
+                % Compute J2 perturbation at a given position
+                mu = obj.gravitationalParameter;
+                R = obj.radius;
+                j2 = obj.J2;
+                r = norm(position);
+                z = position(3);
+                x = position(1);
+                y = position(2);
+                
+                % Common factor
+                factor = (3/2) * j2 * (mu / r^2) * (R / r)^2;
+                
+                % Components of the perturbation acceleration
+                ax = factor * ((5 * (z^2 / r^2)) - 1) * (x / r);
+                ay = factor * ((5 * (z^2 / r^2)) - 1) * (y / r);
+                az = factor * ((5 * (z^2 / r^2)) - 3) * (z / r);
+                
+                % J2 perturbation acceleration
+                J2Acc = [ax; ay; az];
+            end
+        end
+
+        function plotCentralBody(obj)
+            % Plot the central body as a sphere with Earth surface texture
+            r = obj.radius;
+            [X, Y, Z] = sphere(50); % Create a sphere with 50-by-50 faces
+            load('topo.mat', 'topo');
+            props.FaceColor= 'texture';
+            props.EdgeColor = 'none';
+            props.FaceLighting = 'phong';
+            props.CData = topo;
+            X = X * r;
+            Y = Y * r;
+            Z = Z * r;
+            surf(X, Y, Z, props);
+            alpha(0.8); % Make the sphere semi-transparent
+            
+            % Plot the equatorial plane
+            x = -r:r/4:r;
+            y = -r:r/4:r;
+            [X,Y] = meshgrid(x,y);
+            Z = zeros(length(x),length(y));
+            surf(X,Y,Z,'FaceColor','none');
+        end
+    end
+end
+
+% ExampleCase.mclear
+close all
+clc
+
+% Define central body (e.g., Earth)
+earthMass = 5.974e24; % kg
+earthRadius = 6.378e6; % m
+J2 = 0;
+J2 = 1.08262668e-3;
+atmosphereModel = AtmosphereModel('USSA76');
+earth = CentralBody(earthMass, earthRadius, J2, atmosphereModel);
+
+% Define spacecraft using classical orbital elements, r_peri & r_apo, h_e
+spacecraftMass = 4.2; % kg
+dragArea = 0.15; % m^2
+dragCoefficient = 2.2;
+% conditionType    = 'classical';
+% initialCondition = [earth.radius + 800e3,...    % a
+%                     0.0001,...                  % e
+%                     deg2rad(98.6),...           % i
+%                     deg2rad(20),...             % RAAN
+%                     deg2rad(10),...             % w
+%                     deg2rad(0)];                % TA
+conditionType    = 'r_peri_r_apo';
+initialCondition = [earth.radius + 250e3,...    % r_peri
+                    earth.radius + 300e3,...    % r_apo
+                    deg2rad(97),...             % i
+                    deg2rad(20),...             % RAAN
+                    deg2rad(10),...             % w
+                    deg2rad(0)];                % TA
+% conditionType = 'h_e';
+% initialCondition = [5.234474772412042e+10,...   % h                    
+%                     0.0291,...                  % e    
+%                     deg2rad(67),...             % i        
+%                     deg2rad(20),...             % RAAN        
+%                     deg2rad(10),...             % w        
+%                     deg2rad(0)];                % TA        
+spacecraft = Spacecraft(spacecraftMass, dragArea, dragCoefficient, initialCondition, conditionType, earth);
+
+% Define propagator
+timeStep = 10; % seconds
+totalTime = 3600*3; % seconds
+altitudeLimit = 200e3; % m
+propagator = Propagator(spacecraft, earth, timeStep, totalTime, altitudeLimit);
+
+% Run propagation
+trajectory = propagator.propagate();
+
+% Convert trajectory to orbital elements
+elementsTrajectory = OrbitalElements.fromStateVector(trajectory, earth.gravitationalParameter);
+
+% Plot central body and trajectory
+f1 = figure;
+hold on;
+earth.plotCentralBody();
+plot3(trajectory(:, 1), trajectory(:, 2), trajectory(:, 3), 'r', 'LineWidth', 0.5);
+xlabel('X (m)');
+ylabel('Y (m)');
+zlabel('Z (m)');
+title('Spacecraft Trajectory around Earth');
+grid on;
+axis equal;
+
+% Set fixed 3D view angle
+azimuth = 45; % Azimuth angle
+elevation = 30; % Elevation angle
+view(azimuth, elevation);
+
+% Plot orbital elements over time
+f2 = figure;
+subplot(3, 2, 1);
+plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 1));
+xlabel('Time (s)');
+ylabel('Semi-major axis (m)');
+title('Semi-major axis');
+
+subplot(3, 2, 2);
+plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 2));
+xlabel('Time (s)');
+ylabel('Eccentricity');
+title('Eccentricity');
+
+subplot(3, 2, 3);
+plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 3));
+xlabel('Time (s)');
+ylabel('Inclination (rad)');
+title('Inclination');
+
+subplot(3, 2, 4);
+plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 4));
+xlabel('Time (s)');
+ylabel('RAAN (rad)');
+title('RAAN');
+
+subplot(3, 2, 5);
+plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 5));
+xlabel('Time (s)');
+ylabel('Argument of Periapsis (rad)');
+title('Argument of Periapsis');
+
+subplot(3, 2, 6);
+plot(linspace(0, totalTime, size(elementsTrajectory, 1)), elementsTrajectory(:, 6));
+xlabel('Time (s)');
+ylabel('True Anomaly (rad)');
+title('True Anomaly');
+
+% Make figures fullscreen
+set(f1,'WindowState','fullscreen');
+pause(3);
+set(f2,'WindowState','fullscreen');
+
+% OrbitalElements.mclassdef OrbitalElements
+    properties
+        % Orbital elements
+        semiMajorAxis
+        eccentricity
+        inclination
+        raan % Right Ascension of Ascending Node
+        argOfPeriapsis % Argument of Periapsis
+        trueAnomaly
+    end
+    
+    methods
+        function obj = OrbitalElements(elements, elementType, mu)
+            % Constructor that takes different sets of orbital elements
+            % and converts them to the standard set (a, e, i, RAAN, w, TA)
+            if nargin == 0
+                return; % Allow creating an empty object
+            end
+            switch elementType
+                case 'classical'
+                    obj.semiMajorAxis = elements(1);
+                    obj.eccentricity = elements(2);
+                    obj.inclination = elements(3);
+                    obj.raan = elements(4);
+                    obj.argOfPeriapsis = elements(5);
+                    obj.trueAnomaly = elements(6);
+                case 'r_peri_r_apo'
+                    r_peri = elements(1);
+                    r_apo = elements(2);
+                    obj.eccentricity = (r_apo - r_peri) / (r_apo + r_peri);
+                    obj.semiMajorAxis = (r_peri + r_apo) / 2;
+                    obj.inclination = elements(3);
+                    obj.raan = elements(4);
+                    obj.argOfPeriapsis = elements(5);
+                    obj.trueAnomaly = elements(6);
+                case 'h_e'
+                    h = elements(1);
+                    obj.eccentricity = elements(2);
+                    obj.inclination = elements(3);
+                    obj.raan = elements(4);
+                    obj.argOfPeriapsis = elements(5);
+                    obj.trueAnomaly = elements(6);
+                    obj.semiMajorAxis = h^2 / (mu * (1 - obj.eccentricity^2));
+                otherwise
+                    error('Unknown element type');
+            end
+        end
+        
+        function state = toStateVector(obj, mu)
+            % Convert orbital elements to state vector [r; v]
+            a = obj.semiMajorAxis;
+            e = obj.eccentricity;
+            i = obj.inclination;
+            RAAN = obj.raan;
+            w = obj.argOfPeriapsis;
+            TA = obj.trueAnomaly;
+            
+            % Compute the position and velocity in the perifocal coordinate system
+            p = a * (1 - e^2);
+            r_perifocal = (p / (1 + e * cos(TA))) * [cos(TA); sin(TA); 0];
+            v_perifocal = sqrt(mu / p) * [-sin(TA); e + cos(TA); 0];
+            
+            % Rotation matrices
+            R3_W = [cos(RAAN) -sin(RAAN) 0; sin(RAAN) cos(RAAN) 0; 0 0 1];
+            R1_i = [1 0 0; 0 cos(i) -sin(i); 0 sin(i) cos(i)];
+            R3_w = [cos(w) -sin(w) 0; sin(w) cos(w) 0; 0 0 1];
+            
+            % Combined rotation matrix
+            Q = R3_W' * R1_i' * R3_w';
+            
+            % Convert to inertial frame
+            r_inertial = Q * r_perifocal;
+            v_inertial = Q * v_perifocal;
+            
+            state = [r_inertial; v_inertial];
+        end
+    end
+    
+    methods (Static)
+        function elementsTrajectory = fromStateVector(stateTrajectory, mu)
+            % Convert state vector trajectory [r; v] to orbital elements trajectory
+            numPoints = size(stateTrajectory, 1);
+            elementsTrajectory = zeros(numPoints, 6);
+            for k = 1:numPoints
+                state = stateTrajectory(k, :)';
+                elementsTrajectory(k, :) = singleStateToElements(state, mu);
+            end
+            
+            function elements = singleStateToElements(state, mu)
+                % Convert single state vector [r; v] to classical orbital elements
+                r = state(1:3);
+                v = state(4:6);
+                h = cross(r, v);
+                n = cross([0; 0; 1], h);
+                
+                % Eccentricity vector
+                e_vec = (cross(v, h) / mu) - (r / norm(r));
+                e = norm(e_vec);
+                
+                % Semi-major axis
+                a = 1 / (2 / norm(r) - norm(v)^2 / mu);
+                
+                % Inclination
+                i = acos(h(3) / norm(h));
+                
+                % Right ascension of ascending node
+                RAAN = acos(n(1) / norm(n));
+                if n(2) < 0
+                    RAAN = 2 * pi - RAAN;
+                end
+                
+                % Argument of periapsis
+                w = acos(dot(n, e_vec) / (norm(n) * norm(e_vec)));
+                if e_vec(3) < 0
+                    w = 2 * pi - w;
+                end
+                
+                % True anomaly
+                TA = acos(dot(e_vec, r) / (norm(e_vec) * norm(r)));
+                if dot(r, v) < 0
+                    TA = 2 * pi - TA;
+                end
+                
+                elements = [a, e, i, RAAN, w, TA];
+            end
+        end
+    end
+end
+
+% Propagator.mclassdef Propagator
+    properties
+        spacecraft % Spacecraft object
+        centralBody % CentralBody object
+        timeStep % Time step for recording output
+        totalTime % Total simulation time
+        altitudeLimit % below this altitude the propagation is aborted
+    end
+    
+    methods
+        function obj = Propagator(spacecraft, centralBody, timeStep, totalTime, altitudeLimit)
+            obj.spacecraft = spacecraft;
+            obj.centralBody = centralBody;
+            obj.timeStep = timeStep;
+            obj.totalTime = totalTime;
+            obj.altitudeLimit = altitudeLimit;
+        end
+        
+        function trajectory = propagate(obj)
+            % Initial state vector
+            initialState = [obj.spacecraft.state.position; obj.spacecraft.state.velocity];
+            
+            % Time span for integration
+            tspan = [0 obj.totalTime];
+            
+            % Set error tolerances and event function
+            options = odeset('reltol', 1.e-10, ...
+                             'abstol', 1.e-10, ...
+                             'events', @(t, state) altitudeEvent(t, state, obj.centralBody, obj.altitudeLimit));
+            
+            % Use ode45 to integrate the equations of motion
+            [T, Y, TE, YE, IE] = ode45(@odefun, tspan, initialState, options);
+            
+            % Interpolate results at specified time steps for output
+            numSteps = floor(obj.totalTime / obj.timeStep) + 1;
+            tOutput = linspace(0, obj.totalTime, numSteps);
+            Y_interp = interp1(T, Y, tOutput);
+            
+            % Store trajectory as [x, y, z, vx, vy, vz] for each time step
+            trajectory = Y_interp;
+
+            % Define the differential equations
+            function dState = odefun(t, state)
+                % Extract position and velocity
+                position = state(1:3);
+                velocity = state(4:6);
+                
+                % Compute gravitational acceleration
+                gravityAcc = obj.centralBody.getGravityAccel(position);
+                
+                % Compute atmospheric drag if atmosphere model is present
+                if ~isempty(obj.centralBody.atmosphereModel)
+                    altitude = norm(position) - obj.centralBody.radius;
+                    density = obj.centralBody.atmosphereModel.density(altitude);
+                    dragForce = obj.spacecraft.applyDrag(density, velocity);
+                    dragAcc = dragForce / obj.spacecraft.mass;
+                else
+                    dragAcc = [0; 0; 0];
+                end
+                
+                % Total acceleration
+                totalAcc = gravityAcc + dragAcc;
+                
+                % Return derivatives
+                dState = [velocity; totalAcc];
+            end
+
+            function [value, isTerminal, direction] = altitudeEvent(t, state, centralBody, altitudeLimit)
+                position = state(1:3);
+                altitude = norm(position) - centralBody.radius;
+                
+                % Event is detected when altitude falls below altitudeLimit
+                value = altitude - altitudeLimit;
+                isTerminal = 1; % Stop the integration
+                direction = -1; % Negative direction (altitude decreasing)
+            end
+
+        end
+    end
+end
+
+% Spacecraft.mclassdef Spacecraft
+    properties
+        mass
+        dragArea
+        dragCoefficient
+        state
+    end
+    
+    methods
+        function obj = Spacecraft(mass, dragArea, dragCoefficient, initialCondition, conditionType, centralBody)
+            obj.mass = mass;
+            obj.dragArea = dragArea;
+            obj.dragCoefficient = dragCoefficient;
+            mu = centralBody.gravitationalParameter;
+            
+            if strcmp(conditionType, 'stateVector')
+                obj.state = initialCondition;
+            else
+                elements = OrbitalElements(initialCondition, conditionType, mu);
+                stateVector = elements.toStateVector(mu);
+                obj.state = State(stateVector(1:3), stateVector(4:6));
+            end
+        end
+        
+        function dragForce = applyDrag(obj, density, relativeVelocity)
+            % Compute drag force based on current state and environment
+            speed = norm(relativeVelocity);
+            dragForce = -0.5 * density * speed^2 * obj.dragCoefficient * obj.dragArea * (relativeVelocity / speed);
+        end
+    end
+end
+
+% State.mclassdef State
+    properties
+        position % 3x1 double
+        velocity % 3x1 double
+    end
+    
+    methods
+        function obj = State(position, velocity)
+            obj.position = position;
+            obj.velocity = velocity;
+        end
+        
+        function pos = getPosition(obj)
+            pos = obj.position;
+        end
+        
+        function vel = getVelocity(obj)
+            vel = obj.velocity;
+        end
+        
+        function updatePosition(obj, newPosition)
+            obj.position = newPosition;
+        end
+        
+        function updateVelocity(obj, newVelocity)
+            obj.velocity = newVelocity;
+        end
+    end
+end
