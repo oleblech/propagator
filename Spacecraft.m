@@ -4,6 +4,7 @@ classdef Spacecraft
         dragArea
         dragCoefficient
         state
+        centralBody
     end
     
     methods
@@ -11,7 +12,8 @@ classdef Spacecraft
             obj.mass = mass;
             obj.dragArea = dragArea;
             obj.dragCoefficient = dragCoefficient;
-            mu = centralBody.gravitationalParameter;
+            obj.centralBody = centralBody;
+            mu = obj.centralBody.gravitationalParameter;
             
             if strcmp(conditionType, 'stateVector')
                 obj.state = initialCondition;

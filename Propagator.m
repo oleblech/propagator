@@ -1,7 +1,6 @@
 classdef Propagator
     properties
         spacecraft % Spacecraft object
-        centralBody % CentralBody object
         startTime % Epoch when simulation starts
         timeStep % Time step for recording output
         stopTime % Epoch when simulation ends
@@ -9,9 +8,8 @@ classdef Propagator
     end
     
     methods
-        function obj = Propagator(spacecraft, centralBody, startTime, timeStep, stopTime, altitudeLimit)
+        function obj = Propagator(spacecraft, startTime, timeStep, stopTime, altitudeLimit)
             obj.spacecraft = spacecraft;
-            obj.centralBody = centralBody;
             obj.startTime = startTime;
             obj.timeStep = timeStep;
             obj.stopTime = stopTime;
@@ -29,7 +27,7 @@ classdef Propagator
             % Set error tolerances and event function
             options = odeset('reltol', 1.e-10, ...
                              'abstol', 1.e-10, ...
-                             'events', @(t, state) altitudeEvent(t, state, obj.centralBody, obj.altitudeLimit));
+                             'events', @(t, state) altitudeEvent(t, state, obj.spacecraft.centralBody, obj.altitudeLimit));
             
             % Use ode45 to integrate the equations of motion
             [T, Y, TE, YE, IE] = ode45(@odefun, tspan, initialState, options);
@@ -62,11 +60,11 @@ classdef Propagator
                 altitude = lla(3);
                 
                 % Compute gravitational acceleration
-                gravityAcc = obj.centralBody.getGravityAccel(position);
+                gravityAcc = obj.spacecraft.centralBody.getGravityAccel(position);
                 
                 % Compute atmospheric drag if atmosphere model is present
-                if ~isempty(obj.centralBody.atmosphereModel)
-                    density = obj.centralBody.atmosphereModel.density(latitude, longitude, altitude, utcDateTime);
+                if ~isempty(obj.spacecraft.centralBody.atmosphereModel)
+                    density = obj.spacecraft.centralBody.atmosphereModel.density(latitude, longitude, altitude, utcDateTime);
                     dragForce = obj.spacecraft.applyDrag(density, velocity);
                     dragAcc = dragForce / obj.spacecraft.mass;
                 else

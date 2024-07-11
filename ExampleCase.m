@@ -42,7 +42,7 @@ startTime = datetime(2000,1,1,12,0,0);
 timeStep = 10; % seconds
 stopTime = startTime + hours(3);
 altitudeLimit = 200e3; % m
-propagator = Propagator(spacecraft, earth,startTime, timeStep, stopTime, altitudeLimit);
+propagator = Propagator(spacecraft, startTime, timeStep, stopTime, altitudeLimit);
 
 % Run propagation
 trajectory = propagator.propagate();
