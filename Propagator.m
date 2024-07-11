@@ -2,16 +2,16 @@ classdef Propagator
     properties
         spacecraft % Spacecraft object
         startTime % Epoch when simulation starts
-        timeStep % Time step for recording output
+        sampleTime % Time step for recording output
         stopTime % Epoch when simulation ends
         altitudeLimit % below this altitude the propagation is aborted
     end
     
     methods
-        function obj = Propagator(spacecraft, startTime, timeStep, stopTime, altitudeLimit)
+        function obj = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit)
             obj.spacecraft = spacecraft;
             obj.startTime = startTime;
-            obj.timeStep = timeStep;
+            obj.sampleTime = sampleTime;
             obj.stopTime = stopTime;
             obj.altitudeLimit = altitudeLimit;
         end
@@ -33,7 +33,7 @@ classdef Propagator
             [T, Y, TE, YE, IE] = ode45(@odefun, tspan, initialState, options);
             
             % Interpolate results at specified time steps for output
-            numSteps = floor(duration / obj.timeStep) + 1;
+            numSteps = floor(duration / obj.sampleTime) + 1;
             tOutput = linspace(0, duration, numSteps);
             Y_interp = interp1(T, Y, tOutput);
             
