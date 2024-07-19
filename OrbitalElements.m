@@ -1,4 +1,5 @@
 classdef OrbitalElements
+    % A set of six classical orbital elements. Allows conversion to and from state vector.
     properties
         % Orbital elements
         semiMajorAxis

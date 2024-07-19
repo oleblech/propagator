@@ -1,4 +1,5 @@
 classdef Spacecraft
+    % Spacecraft which orbits a central body. It experiences different kinds of accelerations.
     properties
         mass
         dragArea

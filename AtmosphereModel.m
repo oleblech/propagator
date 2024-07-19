@@ -1,4 +1,5 @@
 classdef AtmosphereModel
+    % Class to represent the atmosphere of a central body. Mainly calculates the density based on current location and time.
     properties
         modelType
     end
@@ -18,7 +19,7 @@ classdef AtmosphereModel
                     secondOfDay = utcDateTime.Hour * 3600 + utcDateTime.Minute * 60 + utcDateTime.Second; % Second of day
                     
                     % Call atmosnrlmsise00 to get densities
-                    [~, allDensities] = atmosnrlmsise00(altitude, latitude, longitude, year, dayOfYear, secondOfDay,'None');
+                    [~, allDensities] = atmosnrlmsise00(altitude, latitude, longitude, year, dayOfYear, secondOfDay,'none');
                     
                     % Choose total mass density
                     rho = allDensities(6);

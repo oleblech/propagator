@@ -1,4 +1,5 @@
 classdef Propagator
+    % Integrates the trajectory of a spacecraft orbiting a central body.
     properties
         spacecraft % Spacecraft object
         startTime % Epoch when simulation starts

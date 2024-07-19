@@ -1,4 +1,5 @@
 classdef State
+    % The state of a spacecraft. 
     properties
         position % 3x1 double
         velocity % 3x1 double

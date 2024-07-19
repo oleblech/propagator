@@ -1,4 +1,5 @@
 classdef CentralBody
+    % Represents a central body a spacecraft is orbiting
     properties
         mass
         radius
