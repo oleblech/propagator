@@ -1,4 +1,4 @@
-classdef State
+classdef State < handle
     % The state of a spacecraft. 
     properties
         position % 3x1 double

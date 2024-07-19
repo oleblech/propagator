@@ -7,9 +7,9 @@ classdef Simulation < handle
         stopTime
         altitudeLimit
         propagator
-        plotTrajectory = false;
-        plotOrbitalElements = false;
-        plotGroundTrack = false;
+        plotTrajectory
+        plotOrbitalElements
+        plotGroundTrack
     end
     
     methods
@@ -20,10 +20,14 @@ classdef Simulation < handle
             obj.stopTime = stopTime;
             obj.altitudeLimit = altitudeLimit;
             obj.propagator = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit);
+            obj.plotTrajectory = false;
+            obj.plotOrbitalElements = false;
+            obj.plotGroundTrack = false;
+
         end
         
         function run(obj)
-            trajectory = obj.propagator.propagate();
+            [trajectory,TE,YE,IE] = obj.propagator.propagate();
             
 
             if(obj.plotTrajectory)
@@ -36,19 +40,9 @@ classdef Simulation < handle
             end
 
             if(obj.plotGroundTrack)
-                position = trajectory(:,1:3);
-                utcDateTime = obj.startTime:seconds(obj.sampleTime):obj.stopTime;
-                utcDateTimeArray = [year(utcDateTime')...
-                                    month(utcDateTime')...
-                                    day(utcDateTime')...
-                                    hour(utcDateTime')...
-                                    minute(utcDateTime')...
-                                    second(utcDateTime')];
-                lla = eci2lla(position, utcDateTimeArray);
-                latitude = lla(:,1);
-                longitude = lla(:,2);
+                
 
-                obj.plotGroundTrackFun(latitude, longitude);
+                obj.plotGroundTrackFun(trajectory,TE,YE,IE);
             end
 
         end
@@ -110,10 +104,42 @@ classdef Simulation < handle
             title('True Anomaly');
         end
         
-        function plotGroundTrackFun(obj, latitude, longitude)
-            geoplot(latitude,longitude,'.');
+        function plotGroundTrackFun(obj,trajectory,TE,YE,IE)
+            % plot ground track
+            position = trajectory(:,1:3);
+            utcDateTime = obj.startTime:seconds(obj.sampleTime):obj.stopTime;
+            utcDateTimeArray = [year(utcDateTime')...
+                                month(utcDateTime')...
+                                day(utcDateTime')...
+                                hour(utcDateTime')...
+                                minute(utcDateTime')...
+                                second(utcDateTime')];
+            lla = eci2lla(position, utcDateTimeArray);
+            latitude = lla(:,1);
+            longitude = lla(:,2);
+            geoplot(latitude,longitude,'.','LineWidth',2);
             hold on
-            geoplot(latitude(1),longitude(1),'*');
+
+            % plot initial condition
+            geoplot(latitude(1),longitude(1),'*r','LineWidth',2);
+            
+            % plot Field of View of Point of Interest
+            FOV = obj.spacecraft.poi.getFOV();
+            geoplot(FOV(:,1),FOV(:,2),'r--','LineWidth',2);
+
+            % plot contacts
+            utcDateTimeContacs = obj.startTime + seconds(TE);
+            utcDateTimeArrayContacts = [year(utcDateTimeContacs)...
+                                        month(utcDateTimeContacs)...
+                                        day(utcDateTimeContacs)...
+                                        hour(utcDateTimeContacs)...
+                                        minute(utcDateTimeContacs)...
+                                        second(utcDateTimeContacs)];
+            llaContacts = eci2lla(YE(:,1:3),utcDateTimeArrayContacts);
+            geoplot(llaContacts(1),llaContacts(2),'*g','LineWidth',2);
+
+            % set title and map type
+            title(sprintf('contactCount: %i',obj.spacecraft.poi.contactCount));
             geobasemap topographic;
         end
     end

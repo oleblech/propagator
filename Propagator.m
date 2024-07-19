@@ -1,4 +1,4 @@
-classdef Propagator
+classdef Propagator < handle
     % Integrates the trajectory of a spacecraft orbiting a central body.
     properties
         spacecraft % Spacecraft object
@@ -17,7 +17,7 @@ classdef Propagator
             obj.altitudeLimit = altitudeLimit;
         end
         
-        function trajectory = propagate(obj)
+        function [trajectory,TE,YE,IE] = propagate(obj)
             % Initial state vector
             initialState = [obj.spacecraft.state.position; obj.spacecraft.state.velocity];
             
@@ -26,9 +26,9 @@ classdef Propagator
             tspan = [0 duration];
             
             % Set error tolerances and event function
-            options = odeset('reltol', 1.e-10, ...
-                             'abstol', 1.e-10, ...
-                             'events', @(t, state) altitudeEvent(t, state, obj.spacecraft.centralBody, obj.altitudeLimit));
+            options = odeset('RelTol', 1e-10, ...
+                             'AbsTol', 1e-10, ...
+                             'events', @(t, state) eventFunction(t, state, obj.spacecraft, obj.altitudeLimit));
             
             % Use ode45 to integrate the equations of motion
             [T, Y, TE, YE, IE] = ode45(@odefun, tspan, initialState, options);
@@ -56,16 +56,14 @@ classdef Propagator
                                     minute(utcDateTime)...
                                     second(utcDateTime)];
                 lla = eci2lla(position', utcDateTimeArray);
-                latitude = lla(1);
-                longitude = lla(2);
-                altitude = lla(3);
+                obj.spacecraft.updateLastLLA(lla);
                 
                 % Compute gravitational acceleration
                 gravityAcc = obj.spacecraft.centralBody.getGravityAccel(position);
                 
                 % Compute atmospheric drag if atmosphere model is present
                 if ~isempty(obj.spacecraft.centralBody.atmosphereModel)
-                    density = obj.spacecraft.centralBody.atmosphereModel.density(latitude, longitude, altitude, utcDateTime);
+                    density = obj.spacecraft.centralBody.atmosphereModel.density(lla(1), lla(2), lla(3), utcDateTime);
                     dragForce = obj.spacecraft.applyDrag(density, velocity);
                     dragAcc = dragForce / obj.spacecraft.mass;
                 else
@@ -79,16 +77,20 @@ classdef Propagator
                 dState = [velocity; totalAcc];
             end
 
-            function [value, isTerminal, direction] = altitudeEvent(t, state, centralBody, altitudeLimit)
+            function [value, isTerminal, direction] = eventFunction(t, state, spacecraft, altitudeLimit)
+                % Detect if altitude is below altitude limit
                 position = state(1:3);
-                altitude = norm(position) - centralBody.radius;
-                
-                % Event is detected when altitude falls below altitudeLimit
-                value = altitude - altitudeLimit;
-                isTerminal = 1; % Stop the integration
-                direction = -1; % Negative direction (altitude decreasing)
-            end
+                altitude = norm(position) - spacecraft.centralBody.radius;
 
+                value(1) = altitude - altitudeLimit;
+                isTerminal(1) = 1; % Stop the integration
+                direction(1) = -1; % Negative direction (altitude decreasing)
+
+                % Count contacts with point of interest
+                value(2) = spacecraft.checkContact(); % event triggered if 0
+                isTerminal(2) = 0; % Do not stop the integration
+                direction(2) = -1; % Any direction
+            end
         end
     end
 end

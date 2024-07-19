@@ -1,4 +1,4 @@
-classdef CentralBody
+classdef CentralBody < handle
     % Represents a central body a spacecraft is orbiting
     properties
         mass

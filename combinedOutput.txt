@@ -1,6 +1,6 @@
 
 
-% AtmosphereModel.mclassdef AtmosphereModel
+% AtmosphereModel.mclassdef AtmosphereModel < handle
     % Class to represent the atmosphere of a central body. Mainly calculates the density based on current location and time.
     properties
         modelType
@@ -89,7 +89,7 @@
     end
 end
 
-% CentralBody.mclassdef CentralBody
+% CentralBody.mclassdef CentralBody < handle
     % Represents a central body a spacecraft is orbiting
     properties
         mass
@@ -201,30 +201,27 @@ dragArea = 0.15; % m^2
 dragCoefficient = 2.2;
 conditionType    = 'r_peri_r_apo';
 initialCondition = [earth.radius + 250e3,...    % r_peri
-                    earth.radius + 300e3,...    % r_apo
+                    earth.radius + 250e3,...    % r_apo
                     deg2rad(97),...             % i
                     deg2rad(20),...             % RAAN
-                    deg2rad(10),...             % w
-                    deg2rad(0)];                % TA
+                    deg2rad(30),...             % w
+                    deg2rad(0)];               % TA
+poi = pointOfInterest(30,60,20,20);
 
-spacecraft = Spacecraft(spacecraftMass, dragArea, dragCoefficient, initialCondition, conditionType, earth);
+spacecraft = Spacecraft(spacecraftMass, dragArea, dragCoefficient, initialCondition, conditionType, earth, poi);
 
 %% Define simulation
 startTime = datetime(2000,1,1,12,0,0);
 sampleTime = 10; % seconds
-stopTime = startTime + hours(3);
+stopTime = startTime + hours(5);
 altitudeLimit = 200e3; % m
 sim = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit);
 
 %% Run simulation
-sim.plotTrajectory = true;
-sim.plotOrbitalElements = true;
+% sim.plotTrajectory = true;
+% sim.plotOrbitalElements = true;
 sim.plotGroundTrack = true;
 sim.run();
-
-%% Plot results
-sim.plotTrajectory();
-sim.plotOrbitalElements();
 
 % OrbitalElements.mclassdef OrbitalElements
     % A set of six classical orbital elements. Allows conversion to and from state vector.
@@ -356,7 +353,7 @@ sim.plotOrbitalElements();
     end
 end
 
-% Propagator.mclassdef Propagator
+% Propagator.mclassdef Propagator < handle
     % Integrates the trajectory of a spacecraft orbiting a central body.
     properties
         spacecraft % Spacecraft object
@@ -386,7 +383,8 @@ end
             % Set error tolerances and event function
             options = odeset('reltol', 1.e-10, ...
                              'abstol', 1.e-10, ...
-                             'events', @(t, state) altitudeEvent(t, state, obj.spacecraft.centralBody, obj.altitudeLimit));
+                             'MaxStep', obj.sampleTime, ...
+                             'events', @(t, state) eventFunction(t, state, obj.spacecraft, obj.altitudeLimit));
             
             % Use ode45 to integrate the equations of motion
             [T, Y, TE, YE, IE] = ode45(@odefun, tspan, initialState, options);
@@ -414,16 +412,14 @@ end
                                     minute(utcDateTime)...
                                     second(utcDateTime)];
                 lla = eci2lla(position', utcDateTimeArray);
-                latitude = lla(1);
-                longitude = lla(2);
-                altitude = lla(3);
+                obj.spacecraft.updateLastLLA(lla);
                 
                 % Compute gravitational acceleration
                 gravityAcc = obj.spacecraft.centralBody.getGravityAccel(position);
                 
                 % Compute atmospheric drag if atmosphere model is present
                 if ~isempty(obj.spacecraft.centralBody.atmosphereModel)
-                    density = obj.spacecraft.centralBody.atmosphereModel.density(latitude, longitude, altitude, utcDateTime);
+                    density = obj.spacecraft.centralBody.atmosphereModel.density(lla(1), lla(2), lla(3), utcDateTime);
                     dragForce = obj.spacecraft.applyDrag(density, velocity);
                     dragAcc = dragForce / obj.spacecraft.mass;
                 else
@@ -437,16 +433,20 @@ end
                 dState = [velocity; totalAcc];
             end
 
-            function [value, isTerminal, direction] = altitudeEvent(t, state, centralBody, altitudeLimit)
+            function [value, isTerminal, direction] = eventFunction(t, state, spacecraft, altitudeLimit)
+                % Detect if altitude is below altitude limit
                 position = state(1:3);
-                altitude = norm(position) - centralBody.radius;
-                
-                % Event is detected when altitude falls below altitudeLimit
-                value = altitude - altitudeLimit;
-                isTerminal = 1; % Stop the integration
-                direction = -1; % Negative direction (altitude decreasing)
-            end
+                altitude = norm(position) - spacecraft.centralBody.radius;
 
+                value(1) = altitude - altitudeLimit;
+                isTerminal(1) = 1; % Stop the integration
+                direction(1) = -1; % Negative direction (altitude decreasing)
+
+                % Count contacts with point of interest
+                value(2) = ~spacecraft.checkContact(); % event triggered if 0
+                isTerminal(2) = 0; % Do not stop the integration
+                direction(2) = 0; % Any direction
+            end
         end
     end
 end
@@ -460,9 +460,9 @@ end
         stopTime
         altitudeLimit
         propagator
-        plotTrajectory = false;
-        plotOrbitalElements = false;
-        plotGroundTrack = false;
+        plotTrajectory
+        plotOrbitalElements
+        plotGroundTrack
     end
     
     methods
@@ -473,22 +473,38 @@ end
             obj.stopTime = stopTime;
             obj.altitudeLimit = altitudeLimit;
             obj.propagator = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit);
+            obj.plotTrajectory = false;
+            obj.plotOrbitalElements = false;
+            obj.plotGroundTrack = false;
+
         end
         
         function run(obj)
             trajectory = obj.propagator.propagate();
-            elementsTrajectory = OrbitalElements.fromStateVector(trajectory, obj.spacecraft.centralBody.gravitationalParameter);
             
-            
+
             if(obj.plotTrajectory)
                 obj.plotTrajectoryFun(trajectory);
             end
 
             if(obj.plotOrbitalElements)
+                elementsTrajectory = OrbitalElements.fromStateVector(trajectory, obj.spacecraft.centralBody.gravitationalParameter);
                 obj.plotOrbitalElementsFun(elementsTrajectory);
             end
 
             if(obj.plotGroundTrack)
+                position = trajectory(:,1:3);
+                utcDateTime = obj.startTime:seconds(obj.sampleTime):obj.stopTime;
+                utcDateTimeArray = [year(utcDateTime')...
+                                    month(utcDateTime')...
+                                    day(utcDateTime')...
+                                    hour(utcDateTime')...
+                                    minute(utcDateTime')...
+                                    second(utcDateTime')];
+                lla = eci2lla(position, utcDateTimeArray);
+                latitude = lla(:,1);
+                longitude = lla(:,2);
+
                 obj.plotGroundTrackFun(latitude, longitude);
             end
 
@@ -552,12 +568,18 @@ end
         end
         
         function plotGroundTrackFun(obj, latitude, longitude)
-
+            geoplot(latitude,longitude,'.','LineWidth',2);
+            hold on
+            geoplot(latitude(1),longitude(1),'*','LineWidth',2);
+            FOV = obj.spacecraft.poi.getFOV();
+            geoplot(FOV(:,1),FOV(:,2),'r--','LineWidth',2);
+            geobasemap topographic;
+            title(sprintf('contactCount: %i',obj.spacecraft.poi.contactCount));
         end
     end
 end
 
-% Spacecraft.mclassdef Spacecraft
+% Spacecraft.mclassdef Spacecraft < handle
     % Spacecraft which orbits a central body. It experiences different kinds of accelerations.
     properties
         mass
@@ -565,14 +587,22 @@ end
         dragCoefficient
         state
         centralBody
+        poi % pointOfInterest object
+        lastLatitude % Store last calculated latitude to avoid recomputation
+        lastLongitude % Store last calculated longitude to avoid recomputation
+        lastAltitude % Store last calculated altitude to avoid recomputation
     end
     
     methods
-        function obj = Spacecraft(mass, dragArea, dragCoefficient, initialCondition, conditionType, centralBody)
+        function obj = Spacecraft(mass, dragArea, dragCoefficient, initialCondition, conditionType, centralBody,pointOfInterest)
             obj.mass = mass;
             obj.dragArea = dragArea;
             obj.dragCoefficient = dragCoefficient;
             obj.centralBody = centralBody;
+            obj.poi = pointOfInterest;
+            obj.lastLatitude = NaN;
+            obj.lastLongitude = NaN;
+            obj.lastAltitude = NaN;
             mu = obj.centralBody.gravitationalParameter;
             
             if strcmp(conditionType, 'stateVector')
@@ -589,10 +619,26 @@ end
             speed = norm(relativeVelocity);
             dragForce = -0.5 * density * speed^2 * obj.dragCoefficient * obj.dragArea * (relativeVelocity / speed);
         end
+
+        function obj = updateLastLLA(obj, lla)
+            obj.lastLatitude = lla(1);
+            obj.lastLongitude = lla(2);
+            obj.lastAltitude = lla(3);
+        end
+
+        function isContact = checkContact(obj)
+            % Check if the given latitude and longitude are within the point of interest bounds
+            latWithinBounds = (obj.lastLatitude >= obj.poi.latitude - obj.poi.height / 2) && (obj.lastLatitude <= obj.poi.latitude + obj.poi.height / 2);
+            lonWithinBounds = (obj.lastLongitude >= obj.poi.longitude - obj.poi.width / 2) && (obj.lastLongitude <= obj.poi.longitude + obj.poi.width / 2);
+            isContact = latWithinBounds && lonWithinBounds;
+            if isContact
+               obj.poi.increaseCount();
+            end
+        end
     end
 end
 
-% State.mclassdef State
+% State.mclassdef State < handle
     % The state of a spacecraft. 
     properties
         position % 3x1 double
@@ -619,6 +665,40 @@ end
         
         function obj = updateVelocity(obj, newVelocity)
             obj.velocity = newVelocity;
+        end
+    end
+end
+
+% pointOfInterest.mclassdef pointOfInterest < handle
+    % Represents a point of interest on the surface of the central body
+
+    properties
+        latitude
+        longitude
+        width
+        height
+        contactCount
+    end
+
+    methods
+        function obj = pointOfInterest(latitude,longitude,width,height)
+            obj.latitude = latitude;
+            obj.longitude = longitude;
+            obj.width = width;
+            obj.height = height;
+            obj.contactCount = 0;
+        end
+
+        function FOV = getFOV(obj)
+            FOV(1,:) = [obj.latitude - obj.height/2, obj.longitude - obj.width/2];
+            FOV(2,:) = [obj.latitude + obj.height/2, obj.longitude - obj.width/2];
+            FOV(3,:) = [obj.latitude + obj.height/2, obj.longitude + obj.width/2];
+            FOV(4,:) = [obj.latitude - obj.height/2, obj.longitude + obj.width/2];
+            FOV(5,:) = [obj.latitude - obj.height/2, obj.longitude - obj.width/2];
+        end
+
+        function obj = increaseCount(obj)
+            obj.contactCount = obj.contactCount + 1;
         end
     end
 end

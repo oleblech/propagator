@@ -1,4 +1,4 @@
-classdef AtmosphereModel
+classdef AtmosphereModel < handle
     % Class to represent the atmosphere of a central body. Mainly calculates the density based on current location and time.
     properties
         modelType
