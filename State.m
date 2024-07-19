@@ -19,11 +19,11 @@ classdef State
             vel = obj.velocity;
         end
         
-        function updatePosition(obj, newPosition)
+        function obj = updatePosition(obj, newPosition)
             obj.position = newPosition;
         end
         
-        function updateVelocity(obj, newVelocity)
+        function obj = updateVelocity(obj, newVelocity)
             obj.velocity = newVelocity;
         end
     end

@@ -1,6 +1,7 @@
 
 
 % AtmosphereModel.mclassdef AtmosphereModel
+    % Class to represent the atmosphere of a central body. Mainly calculates the density based on current location and time.
     properties
         modelType
     end
@@ -20,7 +21,7 @@
                     secondOfDay = utcDateTime.Hour * 3600 + utcDateTime.Minute * 60 + utcDateTime.Second; % Second of day
                     
                     % Call atmosnrlmsise00 to get densities
-                    [~, allDensities] = atmosnrlmsise00(altitude, latitude, longitude, year, dayOfYear, secondOfDay,'None');
+                    [~, allDensities] = atmosnrlmsise00(altitude, latitude, longitude, year, dayOfYear, secondOfDay,'none');
                     
                     % Choose total mass density
                     rho = allDensities(6);
@@ -89,6 +90,7 @@
 end
 
 % CentralBody.mclassdef CentralBody
+    % Represents a central body a spacecraft is orbiting
     properties
         mass
         radius
@@ -170,7 +172,7 @@ end
 close all
 clc
 
-% Define central body (e.g., Earth)
+%% Define central body (e.g., Earth)
 earthMass = 5.974e24; % kg
 earthRadius = 6.378e6; % m
 J2 = 0;
@@ -178,10 +180,15 @@ J2 = 1.08262668e-3;
 atmosphereModel = AtmosphereModel('nrlmsise00');
 earth = CentralBody(earthMass, earthRadius, J2, atmosphereModel);
 
-% Define spacecraft using classical orbital elements, r_peri & r_apo, h_e
-spacecraftMass = 4.2; % kg
-dragArea = 0.15; % m^2
-dragCoefficient = 2.2;
+%% Define spacecraft using classical orbital elements, r_peri & r_apo, h_e
+% Alternative initial condition definitions:
+% conditionType = 'h_e';
+% initialCondition = [5.234474772412042e+10,...   % h                    
+%                     0.0291,...                  % e    
+%                     deg2rad(67),...             % i        
+%                     deg2rad(20),...             % RAAN        
+%                     deg2rad(10),...             % w        
+%                     deg2rad(0)];                % TA
 % conditionType    = 'classical';
 % initialCondition = [earth.radius + 800e3,...    % a
 %                     0.0001,...                  % e
@@ -189,6 +196,9 @@ dragCoefficient = 2.2;
 %                     deg2rad(20),...             % RAAN
 %                     deg2rad(10),...             % w
 %                     deg2rad(0)];                % TA
+spacecraftMass = 4.2; % kg
+dragArea = 0.15; % m^2
+dragCoefficient = 2.2;
 conditionType    = 'r_peri_r_apo';
 initialCondition = [earth.radius + 250e3,...    % r_peri
                     earth.radius + 300e3,...    % r_apo
@@ -196,90 +206,28 @@ initialCondition = [earth.radius + 250e3,...    % r_peri
                     deg2rad(20),...             % RAAN
                     deg2rad(10),...             % w
                     deg2rad(0)];                % TA
-% conditionType = 'h_e';
-% initialCondition = [5.234474772412042e+10,...   % h                    
-%                     0.0291,...                  % e    
-%                     deg2rad(67),...             % i        
-%                     deg2rad(20),...             % RAAN        
-%                     deg2rad(10),...             % w        
-%                     deg2rad(0)];                % TA        
+
 spacecraft = Spacecraft(spacecraftMass, dragArea, dragCoefficient, initialCondition, conditionType, earth);
 
-% Define propagator
+%% Define simulation
 startTime = datetime(2000,1,1,12,0,0);
-timeStep = 10; % seconds
+sampleTime = 10; % seconds
 stopTime = startTime + hours(3);
 altitudeLimit = 200e3; % m
-propagator = Propagator(spacecraft, startTime, timeStep, stopTime, altitudeLimit);
+sim = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit);
 
-% Run propagation
-trajectory = propagator.propagate();
+%% Run simulation
+sim.plotTrajectory = true;
+sim.plotOrbitalElements = true;
+sim.plotGroundTrack = true;
+sim.run();
 
-% Convert trajectory to orbital elements
-elementsTrajectory = OrbitalElements.fromStateVector(trajectory, earth.gravitationalParameter);
-
-% Plot central body and trajectory
-f1 = figure;
-hold on;
-earth.plotCentralBody();
-plot3(trajectory(:, 1), trajectory(:, 2), trajectory(:, 3), 'r', 'LineWidth', 0.5);
-xlabel('X (m)');
-ylabel('Y (m)');
-zlabel('Z (m)');
-title('Spacecraft Trajectory around Earth');
-grid on;
-axis equal;
-
-% Set fixed 3D view angle
-azimuth = 45; % Azimuth angle
-elevation = 30; % Elevation angle
-view(azimuth, elevation);
-
-% Plot orbital elements over time
-f2 = figure;
-duration = seconds(stopTime - startTime); % in seconds
-subplot(3, 2, 1);
-plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 1));
-xlabel('Time (s)');
-ylabel('Semi-major axis (m)');
-title('Semi-major axis');
-
-subplot(3, 2, 2);
-plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 2));
-xlabel('Time (s)');
-ylabel('Eccentricity');
-title('Eccentricity');
-
-subplot(3, 2, 3);
-plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 3));
-xlabel('Time (s)');
-ylabel('Inclination (rad)');
-title('Inclination');
-
-subplot(3, 2, 4);
-plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 4));
-xlabel('Time (s)');
-ylabel('RAAN (rad)');
-title('RAAN');
-
-subplot(3, 2, 5);
-plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 5));
-xlabel('Time (s)');
-ylabel('Argument of Periapsis (rad)');
-title('Argument of Periapsis');
-
-subplot(3, 2, 6);
-plot(linspace(0, duration, size(elementsTrajectory, 1)), elementsTrajectory(:, 6));
-xlabel('Time (s)');
-ylabel('True Anomaly (rad)');
-title('True Anomaly');
-
-% Make figures fullscreen
-set(f1,'WindowState','fullscreen');
-pause(3);
-set(f2,'WindowState','fullscreen');
+%% Plot results
+sim.plotTrajectory();
+sim.plotOrbitalElements();
 
 % OrbitalElements.mclassdef OrbitalElements
+    % A set of six classical orbital elements. Allows conversion to and from state vector.
     properties
         % Orbital elements
         semiMajorAxis
@@ -409,19 +357,20 @@ set(f2,'WindowState','fullscreen');
 end
 
 % Propagator.mclassdef Propagator
+    % Integrates the trajectory of a spacecraft orbiting a central body.
     properties
         spacecraft % Spacecraft object
         startTime % Epoch when simulation starts
-        timeStep % Time step for recording output
+        sampleTime % Time step for recording output
         stopTime % Epoch when simulation ends
         altitudeLimit % below this altitude the propagation is aborted
     end
     
     methods
-        function obj = Propagator(spacecraft, startTime, timeStep, stopTime, altitudeLimit)
+        function obj = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit)
             obj.spacecraft = spacecraft;
             obj.startTime = startTime;
-            obj.timeStep = timeStep;
+            obj.sampleTime = sampleTime;
             obj.stopTime = stopTime;
             obj.altitudeLimit = altitudeLimit;
         end
@@ -443,7 +392,7 @@ end
             [T, Y, TE, YE, IE] = ode45(@odefun, tspan, initialState, options);
             
             % Interpolate results at specified time steps for output
-            numSteps = floor(duration / obj.timeStep) + 1;
+            numSteps = floor(duration / obj.sampleTime) + 1;
             tOutput = linspace(0, duration, numSteps);
             Y_interp = interp1(T, Y, tOutput);
             
@@ -502,7 +451,114 @@ end
     end
 end
 
+% Simulation.mclassdef Simulation < handle
+    % Simulates the orbit of a spacecraft around a central body and enables to plot several insights
+    properties
+        spacecraft
+        startTime
+        sampleTime
+        stopTime
+        altitudeLimit
+        propagator
+        plotTrajectory = false;
+        plotOrbitalElements = false;
+        plotGroundTrack = false;
+    end
+    
+    methods
+        function obj = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit)
+            obj.spacecraft = spacecraft;
+            obj.startTime = startTime;
+            obj.sampleTime = sampleTime;
+            obj.stopTime = stopTime;
+            obj.altitudeLimit = altitudeLimit;
+            obj.propagator = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit);
+        end
+        
+        function run(obj)
+            trajectory = obj.propagator.propagate();
+            elementsTrajectory = OrbitalElements.fromStateVector(trajectory, obj.spacecraft.centralBody.gravitationalParameter);
+            
+            
+            if(obj.plotTrajectory)
+                obj.plotTrajectoryFun(trajectory);
+            end
+
+            if(obj.plotOrbitalElements)
+                obj.plotOrbitalElementsFun(elementsTrajectory);
+            end
+
+            if(obj.plotGroundTrack)
+                obj.plotGroundTrackFun(latitude, longitude);
+            end
+
+        end
+        
+        function plotTrajectoryFun(obj, trajectory)
+            figure;
+            hold on;
+            obj.spacecraft.centralBody.plotCentralBody();
+            plot3(trajectory(:, 1), trajectory(:, 2), trajectory(:, 3), 'r', 'LineWidth', 0.5);
+            xlabel('X (m)');
+            ylabel('Y (m)');
+            zlabel('Z (m)');
+            title('Spacecraft Trajectory around Earth');
+            grid on;
+            axis equal;
+            view(45, 30); % Set fixed 3D view angle
+            hold off;
+        end
+        
+        function plotOrbitalElementsFun(obj, elementsTrajectory)
+            figure;
+            duration = seconds(obj.stopTime - obj.startTime); % in seconds
+            timeVec = linspace(0, duration, size(elementsTrajectory, 1));
+            
+            subplot(3, 2, 1);
+            plot(timeVec, elementsTrajectory(:, 1));
+            xlabel('Time (s)');
+            ylabel('Semi-major axis (m)');
+            title('Semi-major axis');
+            
+            subplot(3, 2, 2);
+            plot(timeVec, elementsTrajectory(:, 2));
+            xlabel('Time (s)');
+            ylabel('Eccentricity');
+            title('Eccentricity');
+            
+            subplot(3, 2, 3);
+            plot(timeVec, elementsTrajectory(:, 3));
+            xlabel('Time (s)');
+            ylabel('Inclination (rad)');
+            title('Inclination');
+            
+            subplot(3, 2, 4);
+            plot(timeVec, elementsTrajectory(:, 4));
+            xlabel('Time (s)');
+            ylabel('RAAN (rad)');
+            title('RAAN');
+            
+            subplot(3, 2, 5);
+            plot(timeVec, elementsTrajectory(:, 5));
+            xlabel('Time (s)');
+            ylabel('Argument of Periapsis (rad)');
+            title('Argument of Periapsis');
+            
+            subplot(3, 2, 6);
+            plot(timeVec, elementsTrajectory(:, 6));
+            xlabel('Time (s)');
+            ylabel('True Anomaly (rad)');
+            title('True Anomaly');
+        end
+        
+        function plotGroundTrackFun(obj, latitude, longitude)
+
+        end
+    end
+end
+
 % Spacecraft.mclassdef Spacecraft
+    % Spacecraft which orbits a central body. It experiences different kinds of accelerations.
     properties
         mass
         dragArea
@@ -537,6 +593,7 @@ end
 end
 
 % State.mclassdef State
+    % The state of a spacecraft. 
     properties
         position % 3x1 double
         velocity % 3x1 double
@@ -556,11 +613,11 @@ end
             vel = obj.velocity;
         end
         
-        function updatePosition(obj, newPosition)
+        function obj = updatePosition(obj, newPosition)
             obj.position = newPosition;
         end
         
-        function updateVelocity(obj, newVelocity)
+        function obj = updateVelocity(obj, newVelocity)
             obj.velocity = newVelocity;
         end
     end
