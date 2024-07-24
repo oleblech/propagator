@@ -106,7 +106,8 @@ classdef Simulation < handle
         
         function plotGroundTrackFun(obj,trajectory,TE,YE,IE)
             % plot ground track
-            position = trajectory(:,1:3);
+            idx = ~isnan(trajectory);
+            position = trajectory(find(sum(idx,2)),1:3);
             utcDateTime = obj.startTime:seconds(obj.sampleTime):obj.stopTime;
             utcDateTimeArray = [year(utcDateTime')...
                                 month(utcDateTime')...
@@ -114,6 +115,7 @@ classdef Simulation < handle
                                 hour(utcDateTime')...
                                 minute(utcDateTime')...
                                 second(utcDateTime')];
+            utcDateTimeArray = utcDateTimeArray(find(sum(idx,2)),:);
             lla = eci2lla(position, utcDateTimeArray);
             latitude = lla(:,1);
             longitude = lla(:,2);
@@ -136,10 +138,9 @@ classdef Simulation < handle
                                         minute(utcDateTimeContacs)...
                                         second(utcDateTimeContacs)];
             llaContacts = eci2lla(YE(:,1:3),utcDateTimeArrayContacts);
-            geoplot(llaContacts(1),llaContacts(2),'*g','LineWidth',2);
+            geoplot(llaContacts(:,1),llaContacts(:,2),'*g','LineWidth',2);
 
-            % set title and map type
-            title(sprintf('contactCount: %i',obj.spacecraft.poi.contactCount));
+            % set map type
             geobasemap topographic;
         end
     end

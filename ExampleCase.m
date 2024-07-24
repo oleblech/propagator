@@ -32,18 +32,18 @@ dragCoefficient = 2.2;
 conditionType    = 'r_peri_r_apo';
 initialCondition = [earth.radius + 250e3,...    % r_peri
                     earth.radius + 250e3,...    % r_apo
-                    deg2rad(92),...             % i
+                    deg2rad(97),...             % i
                     deg2rad(20),...             % RAAN
                     deg2rad(30),...             % w
                     deg2rad(0)];               % TA
-poi = pointOfInterest(-50,45,20,20);
+poi = PointOfInterest(-50, 45, 20, 20);
 
 spacecraft = Spacecraft(spacecraftMass, dragArea, dragCoefficient, initialCondition, conditionType, earth, poi);
 
 %% Define simulation
 startTime = datetime(2000,1,1,12,0,0);
 sampleTime = 10; % seconds
-stopTime = startTime + hours(15);
+stopTime = startTime + hours(1);
 altitudeLimit = 200e3; % m
 sim = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit);
 

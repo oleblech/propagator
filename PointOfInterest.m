@@ -1,21 +1,19 @@
-classdef pointOfInterest < handle
+classdef PointOfInterest < handle
     % Represents a point of interest on the surface of the central body
 
     properties
         latitude
         longitude
-        width
         height
-        contactCount
+        width
     end
 
     methods
-        function obj = pointOfInterest(latitude,longitude,width,height)
+        function obj = PointOfInterest(latitude,longitude,height,width)
             obj.latitude = latitude;
             obj.longitude = longitude;
-            obj.width = width;
             obj.height = height;
-            obj.contactCount = 0;
+            obj.width = width;
         end
 
         function FOV = getFOV(obj)
@@ -24,10 +22,6 @@ classdef pointOfInterest < handle
             FOV(3,:) = [obj.latitude + obj.height/2, obj.longitude + obj.width/2];
             FOV(4,:) = [obj.latitude - obj.height/2, obj.longitude + obj.width/2];
             FOV(5,:) = [obj.latitude - obj.height/2, obj.longitude - obj.width/2];
-        end
-
-        function obj = increaseCount(obj)
-            obj.contactCount = obj.contactCount + 1;
         end
     end
 end

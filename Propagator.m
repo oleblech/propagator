@@ -26,8 +26,7 @@ classdef Propagator < handle
             tspan = [0 duration];
             
             % Set error tolerances and event function
-            options = odeset('RelTol', 1e-10, ...
-                             'AbsTol', 1e-10, ...
+            options = odeset('MaxStep', 20, ...
                              'events', @(t, state) eventFunction(t, state, obj.spacecraft, obj.altitudeLimit));
             
             % Use ode45 to integrate the equations of motion
@@ -64,8 +63,8 @@ classdef Propagator < handle
                 % Compute atmospheric drag if atmosphere model is present
                 if ~isempty(obj.spacecraft.centralBody.atmosphereModel)
                     density = obj.spacecraft.centralBody.atmosphereModel.density(lla(1), lla(2), lla(3), utcDateTime);
-                    dragForce = obj.spacecraft.applyDrag(density, velocity);
-                    dragAcc = dragForce / obj.spacecraft.mass;
+                    dragAcc = obj.spacecraft.getDragAccel(density, velocity);
+                    dragAcc = dragAcc / obj.spacecraft.mass;
                 else
                     dragAcc = [0; 0; 0];
                 end
@@ -89,7 +88,7 @@ classdef Propagator < handle
                 % Count contacts with point of interest
                 value(2) = spacecraft.checkContact(); % event triggered if 0
                 isTerminal(2) = 0; % Do not stop the integration
-                direction(2) = -1; % Any direction
+                direction(2) = 0; % Any direction
             end
         end
     end

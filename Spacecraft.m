@@ -33,10 +33,11 @@ classdef Spacecraft < handle
             end
         end
         
-        function dragForce = applyDrag(obj, density, relativeVelocity)
+        function dragAcc = getDragAccel(obj, density, relativeVelocity)
             % Compute drag force based on current state and environment
             speed = norm(relativeVelocity);
             dragForce = -0.5 * density * speed^2 * obj.dragCoefficient * obj.dragArea * (relativeVelocity / speed);
+            dragAcc = dragForce / obj.mass;
         end
 
         function obj = updateLastLLA(obj, lla)
@@ -50,12 +51,6 @@ classdef Spacecraft < handle
             latWithinBounds = (obj.lastLatitude >= obj.poi.latitude - obj.poi.height / 2) && (obj.lastLatitude <= obj.poi.latitude + obj.poi.height / 2);
             lonWithinBounds = (obj.lastLongitude >= obj.poi.longitude - obj.poi.width / 2) && (obj.lastLongitude <= obj.poi.longitude + obj.poi.width / 2);
             isContact = latWithinBounds && lonWithinBounds;
-            if isContact
-               obj.poi.increaseCount();
-               isContact = 1;
-            else
-                isContact = -1;
-            end
         end
     end
 end
