@@ -13,13 +13,13 @@ classdef Simulation < handle
     end
     
     methods
-        function obj = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit)
+        function obj = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit, maxStep)
             obj.spacecraft = spacecraft;
             obj.startTime = startTime;
             obj.sampleTime = sampleTime;
             obj.stopTime = stopTime;
             obj.altitudeLimit = altitudeLimit;
-            obj.propagator = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit);
+            obj.propagator = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit, maxStep);
             obj.plotTrajectory = false;
             obj.plotOrbitalElements = false;
             obj.plotGroundTrack = false;

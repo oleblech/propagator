@@ -6,15 +6,17 @@ classdef Propagator < handle
         sampleTime % Time step for recording output
         stopTime % Epoch when simulation ends
         altitudeLimit % below this altitude the propagation is aborted
+        maxStep % maximum step size of the integration
     end
     
     methods
-        function obj = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit)
+        function obj = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit, maxStep)
             obj.spacecraft = spacecraft;
             obj.startTime = startTime;
             obj.sampleTime = sampleTime;
             obj.stopTime = stopTime;
             obj.altitudeLimit = altitudeLimit;
+            obj.maxStep = maxStep;
         end
         
         function [trajectory,TE,YE,IE] = propagate(obj)
@@ -26,7 +28,7 @@ classdef Propagator < handle
             tspan = [0 duration];
             
             % Set error tolerances and event function
-            options = odeset('MaxStep', 20, ...
+            options = odeset('MaxStep', obj.maxStep, ...
                              'events', @(t, state) eventFunction(t, state, obj.spacecraft, obj.altitudeLimit));
             
             % Use ode45 to integrate the equations of motion

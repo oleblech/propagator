@@ -45,7 +45,8 @@ startTime = datetime(2000,1,1,12,0,0);
 sampleTime = 10; % seconds
 stopTime = startTime + hours(1);
 altitudeLimit = 200e3; % m
-sim = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit);
+maxStep = 10;
+sim = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit, maxStep);
 
 %% Run simulation
 % sim.plotTrajectory = true;
