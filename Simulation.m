@@ -49,16 +49,9 @@ classdef Simulation < handle
         
         function plotTrajectoryFun(obj, trajectory)
             figure;
-            hold on;
             obj.spacecraft.centralBody.plotCentralBody();
+            hold on;
             plot3(trajectory(:, 1), trajectory(:, 2), trajectory(:, 3), 'r', 'LineWidth', 0.5);
-            xlabel('X (m)');
-            ylabel('Y (m)');
-            zlabel('Z (m)');
-            title('Spacecraft Trajectory around Earth');
-            grid on;
-            axis equal;
-            view(45, 30); % Set fixed 3D view angle
             hold off;
         end
         
@@ -105,6 +98,8 @@ classdef Simulation < handle
         end
         
         function plotGroundTrackFun(obj,trajectory,TE,YE,IE)
+            % open figure
+            figure;
             % plot ground track
             idx = ~isnan(trajectory);
             position = trajectory(find(sum(idx,2)),1:3);
@@ -137,9 +132,11 @@ classdef Simulation < handle
                                         hour(utcDateTimeContacs)...
                                         minute(utcDateTimeContacs)...
                                         second(utcDateTimeContacs)];
-            llaContacts = eci2lla(YE(:,1:3),utcDateTimeArrayContacts);
-            geoplot(llaContacts(:,1),llaContacts(:,2),'*g','LineWidth',2);
-
+            if ~isempty(utcDateTimeArrayContacts)
+                llaContacts = eci2lla(YE(:,1:3),utcDateTimeArrayContacts);
+                geoplot(llaContacts(:,1),llaContacts(:,2),'*g','LineWidth',2);
+            end
+            
             % set map type
             geobasemap topographic;
         end

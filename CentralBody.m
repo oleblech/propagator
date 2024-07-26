@@ -53,6 +53,7 @@ classdef CentralBody < handle
         end
 
         function plotCentralBody(obj)
+            hold on
             % Plot the central body as a sphere with Earth surface texture
             r = obj.radius;
             [X, Y, Z] = sphere(50); % Create a sphere with 50-by-50 faces
@@ -73,6 +74,16 @@ classdef CentralBody < handle
             [X,Y] = meshgrid(x,y);
             Z = zeros(length(x),length(y));
             surf(X,Y,Z,'FaceColor','none');
+
+            xlabel('X (m)');
+            ylabel('Y (m)');
+            zlabel('Z (m)');
+            title('Spacecraft Trajectory around Earth');
+            grid on;
+            axis equal;
+            view(45, 30); % Set fixed 3D view angle
+
+            hold off
         end
     end
 end

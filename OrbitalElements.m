@@ -48,6 +48,9 @@ classdef OrbitalElements
         end
         
         function state = toStateVector(obj, mu)
+            % Conversion according to chapter 4.6 of book "Orbital
+            % Mechanics for Engineering Students" by Howard D. Cutis
+
             % Convert orbital elements to state vector [r; v]
             a = obj.semiMajorAxis;
             e = obj.eccentricity;
@@ -62,16 +65,16 @@ classdef OrbitalElements
             v_perifocal = sqrt(mu / p) * [-sin(TA); e + cos(TA); 0];
             
             % Rotation matrices
-            R3_W = [cos(RAAN) -sin(RAAN) 0; sin(RAAN) cos(RAAN) 0; 0 0 1];
-            R1_i = [1 0 0; 0 cos(i) -sin(i); 0 sin(i) cos(i)];
-            R3_w = [cos(w) -sin(w) 0; sin(w) cos(w) 0; 0 0 1];
+            R3_W = [cos(RAAN) sin(RAAN) 0; -sin(RAAN) cos(RAAN) 0; 0 0 1];
+            R1_i = [1 0 0; 0 cos(i) sin(i); 0 -sin(i) cos(i)];
+            R3_w = [cos(w) sin(w) 0; -sin(w) cos(w) 0; 0 0 1];
             
             % Combined rotation matrix
-            Q = R3_W' * R1_i' * R3_w';
+            Q = R3_w * R1_i * R3_W;
             
             % Convert to inertial frame
-            r_inertial = Q * r_perifocal;
-            v_inertial = Q * v_perifocal;
+            r_inertial = Q' * r_perifocal;
+            v_inertial = Q' * v_perifocal;
             
             state = [r_inertial; v_inertial];
         end
