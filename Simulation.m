@@ -100,6 +100,7 @@ classdef Simulation < handle
         function plotGroundTrackFun(obj,trajectory,TE,YE,IE)
             % open figure
             figure;
+
             % plot ground track
             idx = ~isnan(trajectory);
             position = trajectory(find(sum(idx,2)),1:3);
@@ -114,15 +115,19 @@ classdef Simulation < handle
             lla = eci2lla(position, utcDateTimeArray);
             latitude = lla(:,1);
             longitude = lla(:,2);
-            geoplot(latitude,longitude,'.','LineWidth',2);
+            geoplot(latitude,longitude,'.k',MarkerSize=10);
             hold on
 
+            % % plot reference ground track
+            % reference = readtable('./exportsFromSTK/Satellite1_LLA_Position.csv');
+            % geoplot(reference.Lat_deg_,reference.Lon_deg_,'.g',MarkerSize=10);
+
             % plot initial condition
-            geoplot(latitude(1),longitude(1),'*r','LineWidth',2);
+            geoplot(latitude(1),longitude(1),'*r',LineWidth=2);
             
             % plot Field of View of Point of Interest
             FOV = obj.spacecraft.poi.getFOV();
-            geoplot(FOV(:,1),FOV(:,2),'r--','LineWidth',2);
+            geoplot(FOV(:,1),FOV(:,2),'b--',LineWidth=2);
 
             % plot contacts
             utcDateTimeContacs = obj.startTime + seconds(TE);
@@ -134,11 +139,15 @@ classdef Simulation < handle
                                         second(utcDateTimeContacs)];
             if ~isempty(utcDateTimeArrayContacts)
                 llaContacts = eci2lla(YE(:,1:3),utcDateTimeArrayContacts);
-                geoplot(llaContacts(:,1),llaContacts(:,2),'*g','LineWidth',2);
+                geoplot(llaContacts(:,1),llaContacts(:,2),'*y',LineWidth=2);
             end
             
             % set map type
             geobasemap topographic;
+
+            % legend
+            lgd = legend('ground track','start location','field of view of point of interest','contact start/end');
+            lgd.FontSize = 16;
         end
     end
 end

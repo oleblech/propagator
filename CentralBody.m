@@ -1,7 +1,6 @@
 classdef CentralBody < handle
     % Represents a central body a spacecraft is orbiting
     properties
-        mass
         radius
         gravitationalParameter
         J2
@@ -9,10 +8,9 @@ classdef CentralBody < handle
     end
     
     methods
-        function obj = CentralBody(mass, radius, J2, atmosphereModel)
-            obj.mass = mass;
+        function obj = CentralBody(radius, mu, J2, atmosphereModel)
             obj.radius = radius;
-            obj.gravitationalParameter = 6.674e-11 * mass; % G * mass
+            obj.gravitationalParameter = mu; % G * mass
             obj.J2 = J2;
             obj.atmosphereModel = atmosphereModel;
         end

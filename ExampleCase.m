@@ -3,12 +3,15 @@ close all
 clc
 
 %% Define central body (e.g., Earth)
-earthMass = 5.974e24; % kg
-earthRadius = 6.378e6; % m
+% The following three constants are drawn from:
+% Vallado, David A. Fundamentals of astrodynamics and applications. Vol. 12. Springer Science & Business Media, 2001.
+earthRadius = 6378137; % m 
+gravitationalParameter = 3.986004414e14; % m^3/s^2
 J2 = 0;
-% J2 = 1.08262668e-3;
+% J2 = 1.0826267e-3;
+
 atmosphereModel = AtmosphereModel('none');
-earth = CentralBody(earthMass, earthRadius, J2, atmosphereModel);
+earth = CentralBody(earthRadius, gravitationalParameter, J2, atmosphereModel);
 
 %% Define spacecraft using classical orbital elements, r_peri & r_apo, h_e
 % Alternative initial condition definitions:
@@ -50,8 +53,8 @@ maxStep = 10;
 sim = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit, maxStep);
 
 %% Run simulation
-sim.plotTrajectory = true;
-sim.plotOrbitalElements = true;
+% sim.plotTrajectory = true;
+% sim.plotOrbitalElements = true;
 sim.plotGroundTrack = true;
 sim.run();
 

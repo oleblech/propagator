@@ -28,7 +28,7 @@ classdef OrbitalElements
                 case 'r_peri_r_apo'
                     r_peri = elements(1);
                     r_apo = elements(2);
-                    obj.eccentricity = (r_apo - r_peri) / (r_apo + r_peri);
+                    obj.eccentricity = (r_apo - r_peri) / (r_apo + r_peri); % 
                     obj.semiMajorAxis = (r_peri + r_apo) / 2;
                     obj.inclination = elements(3);
                     obj.raan = elements(4);
@@ -48,10 +48,11 @@ classdef OrbitalElements
         end
         
         function state = toStateVector(obj, mu)
+            % Convert orbital elements to state vector [r; v]
             % Conversion according to chapter 4.6 of book "Orbital
             % Mechanics for Engineering Students" by Howard D. Cutis
 
-            % Convert orbital elements to state vector [r; v]
+            % Get classical orbital elements
             a = obj.semiMajorAxis;
             e = obj.eccentricity;
             i = obj.inclination;
