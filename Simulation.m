@@ -26,7 +26,7 @@ classdef Simulation < handle
 
         end
         
-        function run(obj)
+        function [trajectory,TE,YE,IE] = run(obj)
             [trajectory,TE,YE,IE] = obj.propagator.propagate();
             
 
@@ -115,38 +115,41 @@ classdef Simulation < handle
             lla = eci2lla(position, utcDateTimeArray);
             latitude = lla(:,1);
             longitude = lla(:,2);
-            geoplot(latitude,longitude,'.k',MarkerSize=10);
+            geoplot(latitude,longitude,'.m',MarkerSize=10);
             hold on
 
-            % % plot reference ground track
-            % reference = readtable('./exportsFromSTK/Satellite1_LLA_Position.csv');
-            % geoplot(reference.Lat_deg_,reference.Lon_deg_,'.g',MarkerSize=10);
+            % plot reference ground track
+            reference = readtable('./exportsFromSTK/Satellite1_LLA_PositionJ2.csv');
+            geoplot(reference.Lat_deg_,reference.Lon_deg_,'.k',MarkerSize=10);
 
-            % plot initial condition
-            geoplot(latitude(1),longitude(1),'*r',LineWidth=2);
+            % % plot initial condition
+            % geoplot(latitude(1),longitude(1),'*r',LineWidth=2);
+
+            % % plot special point
+            % geoplot(latitude(3047),longitude(3047),'*b',LineWidth=2);
             
-            % plot Field of View of Point of Interest
-            FOV = obj.spacecraft.poi.getFOV();
-            geoplot(FOV(:,1),FOV(:,2),'b--',LineWidth=2);
-
-            % plot contacts
-            utcDateTimeContacs = obj.startTime + seconds(TE);
-            utcDateTimeArrayContacts = [year(utcDateTimeContacs)...
-                                        month(utcDateTimeContacs)...
-                                        day(utcDateTimeContacs)...
-                                        hour(utcDateTimeContacs)...
-                                        minute(utcDateTimeContacs)...
-                                        second(utcDateTimeContacs)];
-            if ~isempty(utcDateTimeArrayContacts)
-                llaContacts = eci2lla(YE(:,1:3),utcDateTimeArrayContacts);
-                geoplot(llaContacts(:,1),llaContacts(:,2),'*y',LineWidth=2);
-            end
+            % % plot Field of View of Point of Interest
+            % FOV = obj.spacecraft.poi.getFOV();
+            % geoplot(FOV(:,1),FOV(:,2),'b--',LineWidth=2);
+            % 
+            % % plot contacts
+            % utcDateTimeContacs = obj.startTime + seconds(TE);
+            % utcDateTimeArrayContacts = [year(utcDateTimeContacs)...
+            %                             month(utcDateTimeContacs)...
+            %                             day(utcDateTimeContacs)...
+            %                             hour(utcDateTimeContacs)...
+            %                             minute(utcDateTimeContacs)...
+            %                             second(utcDateTimeContacs)];
+            % if ~isempty(utcDateTimeArrayContacts)
+            %     llaContacts = eci2lla(YE(:,1:3),utcDateTimeArrayContacts);
+            %     geoplot(llaContacts(:,1),llaContacts(:,2),'*y',LineWidth=2);
+            % end
             
             % set map type
             geobasemap topographic;
 
             % legend
-            lgd = legend('ground track','start location','field of view of point of interest','contact start/end');
+            lgd = legend('MATLAB','STK','start location');
             lgd.FontSize = 16;
         end
     end

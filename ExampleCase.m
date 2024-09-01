@@ -3,12 +3,11 @@ close all
 clc
 
 %% Define central body (e.g., Earth)
-% The following three constants are drawn from:
-% Vallado, David A. Fundamentals of astrodynamics and applications. Vol. 12. Springer Science & Business Media, 2001.
-earthRadius = 6378137; % m 
-gravitationalParameter = 3.986004414e14; % m^3/s^2
+% WGS84
+earthRadius = 6378136.3; % m 
+gravitationalParameter = 3.986004415e14; % m^3/s^2
 J2 = 0;
-% J2 = 1.0826267e-3;
+J2 = 1.0826261738521698e-3;
 
 atmosphereModel = AtmosphereModel('none');
 earth = CentralBody(earthRadius, gravitationalParameter, J2, atmosphereModel);
@@ -56,5 +55,5 @@ sim = Simulation(spacecraft, startTime, sampleTime, stopTime, altitudeLimit, max
 % sim.plotTrajectory = true;
 % sim.plotOrbitalElements = true;
 sim.plotGroundTrack = true;
-sim.run();
+[trajectory,TE,YE,IE] = sim.run();
 
