@@ -7,9 +7,9 @@ classdef Simulation < handle
         stopTime
         altitudeLimit
         propagator
-        plotTrajectory
-        plotOrbitalElements
-        plotGroundTrack
+        plotTrajectoryFlag
+        plotOrbitalElementsFlag
+        plotGroundTrackFlag
     end
     
     methods
@@ -20,34 +20,44 @@ classdef Simulation < handle
             obj.stopTime = stopTime;
             obj.altitudeLimit = altitudeLimit;
             obj.propagator = Propagator(spacecraft, startTime, sampleTime, stopTime, altitudeLimit, maxStep);
-            obj.plotTrajectory = false;
-            obj.plotOrbitalElements = false;
-            obj.plotGroundTrack = false;
+            obj.plotTrajectoryFlag = false;
+            obj.plotOrbitalElementsFlag = false;
+            obj.plotGroundTrackFlag = false;
 
         end
         
-        function [trajectory,TE,YE,IE] = run(obj)
+        function [trajectory,trajLat,trajLon,TE,YE,IE] = run(obj)
             [trajectory,TE,YE,IE] = obj.propagator.propagate();
             
-
-            if(obj.plotTrajectory)
-                obj.plotTrajectoryFun(trajectory);
+            % trajectory to latitude and longitude
+            idx = ~isnan(trajectory);
+            position = trajectory(find(sum(idx,2)),1:3);
+            utcDateTime = obj.startTime:seconds(obj.sampleTime):obj.stopTime;
+            utcDateTimeArray = datevec(utcDateTime);
+            utcDateTimeArray = utcDateTimeArray(find(sum(idx,2)),:);
+            lla = eci2lla(position, utcDateTimeArray);
+            trajLat = lla(:,1);
+            trajLon = lla(:,2);
+            
+            % plot Trajectory
+            if(obj.plotTrajectoryFlag)
+                obj.plotTrajectory(trajectory);
             end
-
-            if(obj.plotOrbitalElements)
+            
+            % plot orbital elements
+            if(obj.plotOrbitalElementsFlag)
                 elementsTrajectory = OrbitalElements.fromStateVector(trajectory, obj.spacecraft.centralBody.gravitationalParameter);
-                obj.plotOrbitalElementsFun(elementsTrajectory);
+                obj.plotOrbitalElements(elementsTrajectory);
             end
-
-            if(obj.plotGroundTrack)
-                
-
-                obj.plotGroundTrackFun(trajectory,TE,YE,IE);
+            
+            % plot ground track
+            if(obj.plotGroundTrackFlag)
+                obj.plotGroundTrack(trajLat,trajLon,"poi",TE,YE);
             end
 
         end
         
-        function plotTrajectoryFun(obj, trajectory)
+        function plotTrajectory(obj, trajectory)
             figure;
             obj.spacecraft.centralBody.plotCentralBody();
             hold on;
@@ -55,7 +65,7 @@ classdef Simulation < handle
             hold off;
         end
         
-        function plotOrbitalElementsFun(obj, elementsTrajectory)
+        function plotOrbitalElements(obj, elementsTrajectory)
             figure;
             duration = seconds(obj.stopTime - obj.startTime); % in seconds
             timeVec = linspace(0, duration, size(elementsTrajectory, 1));
@@ -97,60 +107,82 @@ classdef Simulation < handle
             title('True Anomaly');
         end
         
-        function plotGroundTrackFun(obj,trajectory,TE,YE,IE)
-            % open figure
+        function plotGroundTrack(obj, trajLat, trajLon, varargin)
+            % Open figure
             figure;
-
-            % plot ground track
-            idx = ~isnan(trajectory);
-            position = trajectory(find(sum(idx,2)),1:3);
-            utcDateTime = obj.startTime:seconds(obj.sampleTime):obj.stopTime;
-            utcDateTimeArray = [year(utcDateTime')...
-                                month(utcDateTime')...
-                                day(utcDateTime')...
-                                hour(utcDateTime')...
-                                minute(utcDateTime')...
-                                second(utcDateTime')];
-            utcDateTimeArray = utcDateTimeArray(find(sum(idx,2)),:);
-            lla = eci2lla(position, utcDateTimeArray);
-            latitude = lla(:,1);
-            longitude = lla(:,2);
-            geoplot(latitude,longitude,'.m',MarkerSize=10);
-            hold on
-
-            % plot reference ground track
-            reference = readtable('./exportsFromSTK/Satellite1_LLA_PositionJ2.csv');
-            geoplot(reference.Lat_deg_,reference.Lon_deg_,'.k',MarkerSize=10);
-
-            % % plot initial condition
-            % geoplot(latitude(1),longitude(1),'*r',LineWidth=2);
-
-            % % plot special point
-            % geoplot(latitude(3047),longitude(3047),'*b',LineWidth=2);
+        
+            % Plot ground track
+            geoplot(trajLat, trajLon, '.m', 'MarkerSize', 10);
+            hold on;
+        
+            % Check for optional flags in varargin
+            plotFOV = false;
+            plotPOI = false;
+            plotInit = false;
+            plotContacts = false;
+            TE = [];
+            YE = [];
             
-            % % plot Field of View of Point of Interest
-            % FOV = obj.spacecraft.poi.getFOV();
-            % geoplot(FOV(:,1),FOV(:,2),'b--',LineWidth=2);
-            % 
-            % % plot contacts
-            % utcDateTimeContacs = obj.startTime + seconds(TE);
-            % utcDateTimeArrayContacts = [year(utcDateTimeContacs)...
-            %                             month(utcDateTimeContacs)...
-            %                             day(utcDateTimeContacs)...
-            %                             hour(utcDateTimeContacs)...
-            %                             minute(utcDateTimeContacs)...
-            %                             second(utcDateTimeContacs)];
-            % if ~isempty(utcDateTimeArrayContacts)
-            %     llaContacts = eci2lla(YE(:,1:3),utcDateTimeArrayContacts);
-            %     geoplot(llaContacts(:,1),llaContacts(:,2),'*y',LineWidth=2);
-            % end
-            
-            % set map type
+            % Parse varargin to set flags and extract additional data if needed
+            for i = 1:length(varargin)
+                if ischar(varargin{i}) || isstring(varargin{i})
+                    switch varargin{i}
+                        case 'fov'
+                            plotFOV = true;
+                        case 'poi'
+                            plotPOI = true;
+                        case 'init'
+                            plotInit = true;
+                        case 'contacts'
+                            plotContacts = true;
+                    end
+                elseif isnumeric(varargin{i}) && isempty(TE) && isempty(YE)
+                    % Assign TE and YE if 'contacts' flag is specified and they are provided
+                    TE = varargin{i};
+                    if i < length(varargin) && isnumeric(varargin{i+1})
+                        YE = varargin{i+1};
+                    end
+                end
+            end
+        
+            % Plot initial condition if specified
+            if plotInit
+                geoplot(trajLat(1), trajLon(1), '*r', 'LineWidth', 2);
+            end
+        
+            % Plot Point of Interest if specified
+            if plotPOI
+                poiLat = obj.spacecraft.poi.latitude;
+                poiLon = obj.spacecraft.poi.longitude;
+                geoplot(poiLat, poiLon, '*k', 'LineWidth', 2);
+            end
+        
+            % Plot Field of View of Point of Interest if specified
+            if plotFOV
+                FOV = obj.spacecraft.poi.getFOV();
+                geoplot(FOV(:, 1), FOV(:, 2), 'b--', 'LineWidth', 2);
+            end
+        
+            % Plot contacts if specified and TE and YE data are provided
+            if plotContacts && ~isempty(TE) && ~isempty(YE)
+                utcDateTimeContacts = obj.startTime + seconds(TE);
+                utcDateTimeArrayContacts = datevec(utcDateTimeContacts);
+                if ~isempty(utcDateTimeArrayContacts)
+                    llaContacts = eci2lla(YE(:, 1:3), utcDateTimeArrayContacts);
+                    geoplot(llaContacts(:, 1), llaContacts(:, 2), '*y', 'LineWidth', 2);
+                end
+            end
+        
+            % Set map type
             geobasemap topographic;
-
-            % legend
-            lgd = legend('MATLAB','STK','start location');
-            lgd.FontSize = 16;
+        
+            % Legend
+            legendEntries = {'Trajectory'};
+            if plotInit, legendEntries{end+1} = 'Initial Condition'; end
+            if plotPOI, legendEntries{end+1} = 'Point of Interest'; end
+            if plotFOV, legendEntries{end+1} = 'Field of View'; end
+            if plotContacts, legendEntries{end+1} = 'Begin/End of Contact'; end
+            legend(legendEntries, 'FontSize', 16);
         end
     end
 end

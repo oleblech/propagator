@@ -64,19 +64,19 @@ classdef OrbitalElements
             p = a * (1 - e^2);
             r_perifocal = (p / (1 + e * cos(TA))) * [cos(TA); sin(TA); 0];
             v_perifocal = sqrt(mu / p) * [-sin(TA); e + cos(TA); 0];
-            
+
             % Rotation matrices
             R3_W = [cos(RAAN) sin(RAAN) 0; -sin(RAAN) cos(RAAN) 0; 0 0 1];
             R1_i = [1 0 0; 0 cos(i) sin(i); 0 -sin(i) cos(i)];
             R3_w = [cos(w) sin(w) 0; -sin(w) cos(w) 0; 0 0 1];
-            
+
             % Combined rotation matrix
             Q = R3_w * R1_i * R3_W;
-            
+
             % Convert to inertial frame
             r_inertial = Q' * r_perifocal;
             v_inertial = Q' * v_perifocal;
-            
+
             state = [r_inertial; v_inertial];
         end
     end
@@ -93,8 +93,13 @@ classdef OrbitalElements
             
             function elements = singleStateToElements(state, mu)
                 % Convert single state vector [r; v] to classical orbital elements
-                r = state(1:3);
-                v = state(4:6);
+                if isobject(state)
+                    r = state.position;
+                    v = state.velocity;
+                else
+                    r = state(1:3);
+                    v = state(4:6);
+                end
                 h = cross(r, v);
                 n = cross([0; 0; 1], h);
                 
@@ -128,6 +133,53 @@ classdef OrbitalElements
                 
                 elements = [a, e, i, RAAN, w, TA];
             end
+        end
+        
+        function orbitalElements = fromMixedSpherical(mixedSpherical, centralBody, utc_epoch)
+            % Mixed spherical coordinates:
+            % 1. Latitude lat - measured from -90° to +90°
+            % 2. Longitude lon - measured from -180° to +180°
+            % 3. Altitude h - The object's position above or below the reference
+            % ellipsoid. Altitude is measured along a normal to the surface
+            % of the reference ellipsoid in meters
+            % 4. Horizontal Flight Path Angle gamma - The angle between the
+            % inertial velocity vector and the local horizontal plane,
+            % which is perpendicular to the radius vector
+            % 5. Velocity Azimuth chi - The angle in the satellite local
+            % horizontal plane between the projection of the inertial
+            % velocity vector onto this plane and the local north direction
+            % measured as positive in the clockwise direction
+            % 6. Velocity Magnitude v_mag - The magnitude of the inertial
+            % velocity vector in m/s
+
+            % [lat lon h gamma chi v_mag]
+            % Input dimensions:
+            % [deg deg m deg deg m/s]
+
+            % Rename variables
+            lat = mixedSpherical(1);
+            lon = mixedSpherical(2);
+            h = mixedSpherical(3);
+            gamma = deg2rad(mixedSpherical(4));
+            chi = deg2rad(mixedSpherical(5));
+            v_mag = mixedSpherical(6);
+            
+            % Velocity vector in north, east, down frame (NED)
+            vx_north = cos(gamma) * cos(chi) * v_mag;
+            vy_east = cos(gamma) * sin(chi) * v_mag;
+            vz_down = -sin(gamma) * v_mag;
+
+            % Converting velocity vector from NED frame to ECEF
+            [vx_ecef,vy_ecef,vz_ecef] = ned2ecefv(vx_north,vy_east,vz_down,lat,lon);
+
+            % Converting velocity vector from ECEF to ECI
+            v_eci = ecef2eci(utc_epoch,[vx_ecef,vy_ecef,vz_ecef]);
+
+            % Converting position vector from LLA to ECI
+            r_eci = lla2eci([lat lon h],datevec(utc_epoch));
+
+            % Converting ECI state vector to orbital elements
+            orbitalElements = OrbitalElements.fromStateVector([r_eci v_eci'], centralBody.gravitationalParameter);
         end
     end
 end

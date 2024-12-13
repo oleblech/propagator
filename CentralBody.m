@@ -5,14 +5,16 @@ classdef CentralBody < handle
         gravitationalParameter
         J2
         atmosphereModel
+        angularVelocity
     end
     
     methods
-        function obj = CentralBody(radius, mu, J2, atmosphereModel)
+        function obj = CentralBody(radius, mu, J2, atmosphereModel,angularVelocity)
             obj.radius = radius;
             obj.gravitationalParameter = mu; % G * mass
             obj.J2 = J2;
             obj.atmosphereModel = atmosphereModel;
+            obj.angularVelocity = angularVelocity;
         end
         
         function gravityAcc = getGravityAccel(obj, position)
@@ -32,9 +34,8 @@ classdef CentralBody < handle
                 mu = obj.gravitationalParameter;
                 R = obj.radius;
                 j2 = obj.J2;
-                r = norm(position);
-                z = position(3);
                 x = position(1);
+                z = position(3);
                 y = position(2);
                 
                 % Common factor
@@ -44,7 +45,7 @@ classdef CentralBody < handle
                 ax = factor * ((5 * (z^2 / r^2)) - 1) * (x / r);
                 ay = factor * ((5 * (z^2 / r^2)) - 1) * (y / r);
                 az = factor * ((5 * (z^2 / r^2)) - 3) * (z / r);
-                
+
                 % J2 perturbation acceleration
                 J2Acc = [ax; ay; az];
             end
@@ -56,10 +57,14 @@ classdef CentralBody < handle
             r = obj.radius;
             [X, Y, Z] = sphere(50); % Create a sphere with 50-by-50 faces
             load('topo.mat', 'topo');
+
+            % Rotate texture by 90 degrees eastward
+            rotatedTopo = circshift(topo, [0, size(topo, 2)/4]);
+
             props.FaceColor= 'texture';
             props.EdgeColor = 'none';
             props.FaceLighting = 'phong';
-            props.CData = topo;
+            props.CData = rotatedTopo;
             X = X * r;
             Y = Y * r;
             Z = Z * r;

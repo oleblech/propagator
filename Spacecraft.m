@@ -5,6 +5,7 @@ classdef Spacecraft < handle
         dragArea
         dragCoefficient
         state
+        initialState
         centralBody
         poi % pointOfInterest object
         lastLatitude % Store last calculated latitude to avoid recomputation
@@ -31,6 +32,7 @@ classdef Spacecraft < handle
                 stateVector = elements.toStateVector(mu);
                 obj.state = State(stateVector(1:3), stateVector(4:6));
             end
+            obj.initialState = obj.state;
         end
         
         function dragAcc = getDragAccel(obj, density, relativeVelocity)
@@ -47,10 +49,33 @@ classdef Spacecraft < handle
         end
 
         function isContact = checkContact(obj)
-            % Check if the given latitude and longitude are within the point of interest bounds
+            % In its main part, this function calculates whether there is
+            % contact between the spacecraft and the point of interest,
+            % i.e. the spacecraft is able to see the point of interest.
+            % isContact is 0 when there is no contact.
+            % isContact is 1 when there is contact.
+            % Modifications have been made to that such that a rising edge
+            % is delayed by one time step. This is necessary because always
+            % the first of two points making one egde is detected as the
+            % relevant state. This ensures that all points detected by the
+            % event function represent a state where contact is
+            % established. Otherwise the detected 'start of contact' point
+            % would be the last point without contact before contact is
+            % established.
+            
+            persistent lastContactState;        % 
+
+            if isempty(lastContactState)
+                lastContactState = 1;
+            end
+
+            % Main park: check if the given latitude and longitude are within the point of interest bounds
             latWithinBounds = (obj.lastLatitude >= obj.poi.latitude - obj.poi.height / 2) && (obj.lastLatitude <= obj.poi.latitude + obj.poi.height / 2);
             lonWithinBounds = (obj.lastLongitude >= obj.poi.longitude - obj.poi.width / 2) && (obj.lastLongitude <= obj.poi.longitude + obj.poi.width / 2);
-            isContact = latWithinBounds && lonWithinBounds;
+            currentContactState = latWithinBounds && lonWithinBounds;
+            
+            isContact = lastContactState && currentContactState;
+            lastContactState = currentContactState;
         end
     end
 end
