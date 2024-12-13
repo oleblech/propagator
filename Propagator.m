@@ -22,7 +22,7 @@ classdef Propagator < handle
         function [trajectory,TE,YE,IE] = propagate(obj)
             % Initial state vector
             initialState = [obj.spacecraft.state.position; obj.spacecraft.state.velocity];
-            
+
             % Time span for integration
             duration = seconds(obj.stopTime - obj.startTime); % duration in seconds
             tspan = [0 duration];
@@ -33,8 +33,8 @@ classdef Propagator < handle
                              'AbsTol',1e-6, ...
                              'events', @(t, state) eventFunction(t, state, obj.spacecraft, obj.altitudeLimit));
             
-            % Use ode45 to integrate the equations of motion
-            [T, Y, TE, YE, IE] = ode45(@odefun, tspan, initialState, options);
+            % Use ode113 to integrate the equations of motion
+            [T, Y, TE, YE, IE] = ode113(@odefun, tspan, initialState, options);
             
             % Interpolate results at specified time steps for output
             numSteps = floor(duration / obj.sampleTime) + 1;
@@ -52,12 +52,7 @@ classdef Propagator < handle
 
                 % Convert ECI position to LLA (latitude, longitude, altitude)
                 utcDateTime = obj.startTime + seconds(t);
-                utcDateTimeArray = [year(utcDateTime)...
-                                    month(utcDateTime)...
-                                    day(utcDateTime)...
-                                    hour(utcDateTime)...
-                                    minute(utcDateTime)...
-                                    second(utcDateTime)];
+                utcDateTimeArray = datevec(utcDateTime);
                 lla = eci2lla(position', utcDateTimeArray);
                 obj.spacecraft.updateLastLLA(lla);
                 
@@ -68,7 +63,6 @@ classdef Propagator < handle
                 if ~isempty(obj.spacecraft.centralBody.atmosphereModel)
                     density = obj.spacecraft.centralBody.atmosphereModel.density(lla(1), lla(2), lla(3), utcDateTime);
                     dragAcc = obj.spacecraft.getDragAccel(density, velocity);
-                    dragAcc = dragAcc / obj.spacecraft.mass;
                 else
                     dragAcc = [0; 0; 0];
                 end
